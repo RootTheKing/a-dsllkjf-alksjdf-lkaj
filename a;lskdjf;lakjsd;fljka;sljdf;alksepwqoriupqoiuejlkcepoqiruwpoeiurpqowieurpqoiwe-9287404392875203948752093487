@@ -1,3 +1,6 @@
+
+-- SECTION 1: Rayfield UI Library Setup
+
 print("Loading Rayfield UI Library...")
 local RayfieldURL = "https://raw.githubusercontent.com/SiriusSoftwareLtd/Rayfield/refs/heads/main/source.lua"
 local RayfieldSource = game:HttpGet(RayfieldURL)
@@ -13,11 +16,14 @@ if type(Rayfield) ~= "table" or not Rayfield.CreateWindow then
 end
 print("Rayfield UI Library loaded successfully.")
 
+
+-- SECTION 2: Inventory Module Setup & Hook Preparation
+
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
-
 local RS = ReplicatedStorage:WaitForChild("RS", 10)
+
 local InventoryModule = nil
 local successInv, invResult = pcall(function()
     InventoryModule = require(RS.Modules.Inventory)
@@ -29,7 +35,7 @@ else
     print("Inventory Module loaded successfully.")
 end
 
--- Store original GetItemStats function for later use.
+
 local Original_GetItemStats = InventoryModule.GetItemStats
 if type(Original_GetItemStats) ~= "function" then
     warn("InventoryModule.GetItemStats is not a function!")
@@ -38,7 +44,9 @@ else
     print("Stored reference to original GetItemStats.")
 end
 
+
 local itemOverrides = {}
+
 
 local function Hooked_GetItemStats(itemData, ignoreJewels, figure)
     local success, stats = pcall(Original_GetItemStats, InventoryModule, itemData, ignoreJewels, figure)
@@ -49,7 +57,6 @@ local function Hooked_GetItemStats(itemData, ignoreJewels, figure)
     if type(stats) ~= "table" then
         stats = {}
     end
-
     if itemData and itemData.Name and itemOverrides[itemData.Name] then
         local over = itemOverrides[itemData.Name]
         for statName, value in pairs(over) do
@@ -61,9 +68,12 @@ end
 InventoryModule.GetItemStats = Hooked_GetItemStats
 print("InventoryModule.GetItemStats hooked successfully.")
 
+
+-- SECTION 3: Create Rayfield Window & Combat Tab
+
 print("Creating Rayfield Window...")
 local Window = Rayfield:CreateWindow({
-    Name = "Cheese Hub |  2.0",
+    Name = "Cheese Hub | 2.0",
     LoadingTitle = "Loading Cheese Hub...",
     LoadingSubtitle = "by AssTikklingBandit",
     Size = UDim2.fromOffset(600, 450),
@@ -76,11 +86,13 @@ local Window = Rayfield:CreateWindow({
 })
 print("Window created.")
 
+
 local CombatTab = Window:CreateTab("Combat", 4483362458)
 print("Combat Tab created. Adding elements...")
 
 CombatTab:CreateLabel("Item Stat Modifier")
 CombatTab:CreateLabel("Enter item name and desired stats (client-side only).")
+
 
 local targetItemName = ""
 local inputDefense = 0
@@ -104,7 +116,6 @@ CombatTab:CreateInput({
         print("Target item name set to:", targetItemName)
     end
 })
-
 CombatTab:CreateInput({
     Name = "Defense",
     PlaceholderText = "0",
@@ -243,7 +254,6 @@ CombatTab:CreateButton({
         Rayfield:Notify({ Title = "Stats Set", Content = "Overrides applied for " .. targetItemName .. ".", Duration = 5 })
     end
 })
-
 CombatTab:CreateButton({
     Name = "Clear Stats for Selected Item",
     Callback = function()
@@ -260,9 +270,100 @@ CombatTab:CreateButton({
         end
     end
 })
+CombatTab:CreateLabel("Custom Label: I like boobies")
 
-CombatTab:CreateLabel("I like boobies")
+
+-- SECTION 4b: Autofarm Tab & Auto Fish Feature
+
+local AutofarmTab = Window:CreateTab("Autofarm", 116367301060959)
+print("Autofarm Tab created. Adding auto fish feature...")
+
+
+local autoFishEnabled = false
+local selectedFishingRod = ""
+
+
+AutofarmTab:CreateInput({
+    Name = "Fishing Rod Name",
+    PlaceholderText = "Enter rod name exactly as in your inventory",
+    Flag = "FishingRodName",
+    Callback = function(Value)
+        selectedFishingRod = Value or ""
+        print("Selected fishing rod set to:", selectedFishingRod)
+    end
+})
+
+
+AutofarmTab:CreateToggle({
+    Name = "Enable Auto Fish",
+    Flag = "AutoFishToggle",
+    Callback = function(state)
+        autoFishEnabled = state
+        if state then
+            Rayfield:Notify({ Title = "Auto Fish", Content = "Enabled", Duration = 3 })
+            startAutoFishLoop()
+        else
+            Rayfield:Notify({ Title = "Auto Fish", Content = "Disabled", Duration = 3 })
+        end
+    end
+})
+
+
+function startAutoFishLoop()
+    task.spawn(function()
+        local FishingRemote = RS.Remotes.Misc.ToolAction
+        local FishStateRemote = RS.Remotes.Misc.FishState
+        local FishClockRemote = RS.Remotes.Misc.FishClock
+        local Fishing = false
+        
+        while autoFishEnabled do
+            if selectedFishingRod ~= "" then
+                local backpack = LocalPlayer.Backpack
+                local rod = backpack:FindFirstChild(selectedFishingRod) or (LocalPlayer.Character and LocalPlayer.Character:FindFirstChild(selectedFishingRod))
+                if rod then
+                    if LocalPlayer.Character then
+                        local Character = LocalPlayer.Character
+                        if Character:FindFirstChild("FishBiteGoal") then
+                            FishStateRemote:FireServer("Reel")
+                            Fishing = false
+                        end
+                        if not Fishing and not Character:FindFirstChild("FishBiteGoal") then
+                            Fishing = true
+                            task.wait(1)
+                            FishingRemote:FireServer(rod)
+                            FishStateRemote:FireServer("StopClock")
+                            FishClockRemote:FireServer(rod, nil, Vector3.new(530, 400, 3021))
+                            Rayfield:Notify({ Title = "Auto Fish", Content = "Fishing...", Duration = 1 })
+                        end
+                        if Fishing and not Character:FindFirstChild("FishClock") then
+                            task.wait(1)
+                            FishingRemote:FireServer(rod)
+                            FishStateRemote:FireServer("StopClock")
+                            FishClockRemote:FireServer(rod, nil, Vector3.new(530, 400, 3021))
+                        end
+                        task.wait(2)
+                        if not Character:FindFirstChild("FishClock") then
+                            FishingRemote:FireServer(rod)
+                            FishStateRemote:FireServer("StopClock")
+                            FishClockRemote:FireServer(rod, nil, Vector3.new(530, 400, 3021))
+                        end
+                    end
+                else
+                    Rayfield:Notify({ Title = "Auto Fish", Content = "Selected rod not found in Backpack or Character.", Duration = 4 })
+                    task.wait(3)
+                end
+            else
+                Rayfield:Notify({ Title = "Auto Fish", Content = "No rod selected.", Duration = 3 })
+                task.wait(2)
+            end
+            task.wait(0.5)
+        end
+    end)
+end
+
+
+-- SECTION 5: Load Rayfield Configuration (Optional)
 
 Rayfield:LoadConfiguration()
 
-print("Cheese Hub UI Initialized with Combat Tab.")
+print("Cheese Hub UI Initialized with Combat and Autofarm Tabs.")
