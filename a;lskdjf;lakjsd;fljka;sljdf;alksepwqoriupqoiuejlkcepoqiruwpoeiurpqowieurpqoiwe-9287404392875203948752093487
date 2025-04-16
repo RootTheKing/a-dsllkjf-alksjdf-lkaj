@@ -283,6 +283,8 @@ local autoFishEnabled = false
 local selectedFishingRod = ""
 
 
+AutofarmTab:CreateLabel("Auto Fish 🐟 ")
+
 AutofarmTab:CreateInput({
     Name = "Fishing Rod Name",
     PlaceholderText = "Enter rod name exactly as in your inventory",
